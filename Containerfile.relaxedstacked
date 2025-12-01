@@ -68,7 +68,9 @@ RUN git apply add-search-root.patch
 RUN cp ../jastadd/jastadd2.jar tools/jastadd2.jar
 RUN cp ../cat/cat.jar tools/cat.jar
 
-# Create empty cache configuration file
+# [2025-12-01 Mon 19:32]
+# Create empty cache configuration file.  This is a workaround for a
+# bug in the current relaxed stacked implementation.
 RUN touch ./cache-config.csv
 RUN ./gradlew build
 RUN ./run-cat.sh
