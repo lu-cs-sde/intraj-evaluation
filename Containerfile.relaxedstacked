@@ -1,0 +1,81 @@
+# -*- dockerfile-image-name: "intraj-relaxedstacked" -*-
+
+# openjdk-11-jdk was removed in debian 12, which is needed for
+# extendj, which see below.  Downloading openjdk11 from archives
+# caused other problems.  Bump debian version to 13 if fixed.
+FROM docker.io/debian:11
+
+ENV LANG C.UTF-8
+
+RUN apt-get update && apt-get -y upgrade
+RUN apt-get -y install git
+
+WORKDIR /root
+
+RUN git clone https://github.com/IdrissRio/cat cat
+WORKDIR cat
+RUN git checkout 1f63f93872bc97df675869e4766a99c5f8b447da
+RUN git submodule update --init --recursive
+WORKDIR ..
+
+RUN git clone https://bitbucket.org/jastadd/jastadd2 jastadd
+WORKDIR jastadd
+RUN git checkout idriss--dnc-squashed
+RUN git submodule update --init --recursive
+WORKDIR ..
+
+RUN git clone https://github.com/lu-cs-sde/IntraJ intraj
+WORKDIR intraj
+RUN git checkout cat-csv
+RUN git submodule update --init --recursive
+WORKDIR ..
+
+RUN git clone https://github.com/IdrissRio/RS-SLE2024-Artifact RS-SLE2024-Artifact
+WORKDIR RS-SLE2024-Artifact
+RUN git checkout 8264b44d115d2f7c64aa4d00c047b8c05f82293f
+RUN mv data/evaluation ../analysis-victims
+WORKDIR ..
+RUN rm -rf RS-SLE2024-Artifact
+
+# RUN apt-get -y install default-jdk
+
+# extendj doesn't support latest java version as of 2025-11-12.
+# Remember to bump debian version above if this gets fixed.
+RUN apt-get -y install openjdk-11-jdk
+
+WORKDIR jastadd
+# Manually bump java version
+RUN sed -i "s/'1.6'/'8'/" build.gradle
+RUN ./gradlew
+WORKDIR ..
+
+WORKDIR cat
+RUN ./gradlew build
+WORKDIR ..
+
+
+WORKDIR intraj
+
+# The original code has a NullPointerException, stemming from a
+# collection attribute that has no root.  Patch this.
+WORKDIR src/jastadd/CFG/IntraCFG
+COPY search-root.patch search-root.patch
+RUN git apply search-root.patch
+WORKDIR ../../../..
+COPY add-search-root.patch add-search-root.patch
+RUN git apply add-search-root.patch
+
+RUN cp ../jastadd/jastadd2.jar tools/jastadd2.jar
+RUN cp ../cat/cat.jar tools/cat.jar
+
+# Create empty cache configuration file
+RUN touch ./cache-config.csv
+RUN ./gradlew build
+RUN ./run-cat.sh
+RUN ./gradlew clean build
+
+WORKDIR ..
+
+
+# Let's run an analysis...
+RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA

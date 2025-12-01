@@ -1,0 +1,12 @@
+diff --git a/src/jastadd/CFG/java4/Java4.jrag b/src/jastadd/CFG/java4/Java4.jrag
+index 57aa174..357beba 100644
+--- a/src/jastadd/CFG/java4/Java4.jrag
++++ b/src/jastadd/CFG/java4/Java4.jrag
+@@ -528,6 +528,7 @@ public
+   /**
+    * Predecessor relation.
+    */
++  TypeDecl implements CFGSearchRoot;
+ 
+   MethodDecl contributes nta entry() to CFGNode.predColl();
+   MethodDecl contributes nta exit() to CFGNode.predColl();

@@ -1,0 +1,17 @@
+diff --git a/IntraCFG.jrag b/IntraCFG.jrag
+index b41cf93..98b4ff6 100644
+--- a/IntraCFG.jrag
++++ b/IntraCFG.jrag
+@@ -87,6 +87,9 @@ public
+   eq Entry.isCFGNode() = true;
+ 
+   coll SmallSet<CFGNode> CFGNode
+-      .predColl()[new SmallSet<CFGNode>()] root CFGRoot;
++      .predColl()[new SmallSet<CFGNode>()] root CFGSearchRoot;
+   CFGNode contributes this to CFGNode.predColl() for each succ();
+-}
+\ No newline at end of file
++
++  interface CFGSearchRoot { }
++  CFGRoot implements CFGSearchRoot;
++}
