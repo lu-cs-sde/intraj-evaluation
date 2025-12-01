@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+podman build . \
+       --file Containerfile.relaxedstacked \
+       --output results \
+       --target test-results

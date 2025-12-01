@@ -1,0 +1,228 @@
+diff --git a/src/jastadd/StaticAnalysis/DataFlow/NullAnalysis.jrag b/src/jastadd/StaticAnalysis/DataFlow/NullAnalysis.jrag
+index cced1ec..ff74762 100644
+--- a/src/jastadd/StaticAnalysis/DataFlow/NullAnalysis.jrag
++++ b/src/jastadd/StaticAnalysis/DataFlow/NullAnalysis.jrag
+@@ -41,66 +41,102 @@ public
+   PreIncExpr implements ReachedLVal;
+   PreDecExpr implements ReachedLVal;
+ 
+-  interface Assign extends CFGNode{}
++  interface Assign extends CFGNode {}
+   AssignExpr implements Assign;
+   ImplicitAssignment implements Assign;
+   VariableDeclarator implements Assign;
+ 
+-  /**************************************************************************
+-  ************************** TRFunction *************************************
+-  ***************************************************************************
+-  */
+-  syn Gamma CFGNode.trFun(Gamma gamma) { return gamma; }
+-  eq Assign.trFun(Gamma gamma) {
+-    Variable decl = getDeclaration();
+-    if (getMayBeNull())
+-      gamma._put(decl, AbsDomain.NULL);
+-    else
+-      gamma._put(decl, AbsDomain.NOTNULL);
+-    return gamma;
+-  }
++  public class GammaWithDelta {
++      public Gamma gamma = new Gamma();
++      public Gamma delta = new Gamma();
++
++      public GammaWithDelta() {
++      }
++      public GammaWithDelta(GammaWithDelta other) {
++          gamma = new Gamma(other.gamma);
++          delta = new Gamma(other.delta);
++      }
+ 
+-  eq VarAccess.trFun(Gamma gamma) {
+-    Variable decl = varDecl();
+-    if (NA_in().get(decl) == AbsDomain.NULL && isDereferencing())
+-      gamma._put(decl, AbsDomain.NOTNULL);
+-    return gamma;
++      @Override
++      public boolean equals(Object o) {
++          if (!(o instanceof GammaWithDelta)) {return false;}
++          GammaWithDelta other = (GammaWithDelta) o;
++
++          return gamma.equals(other.gamma) &&
++                  delta.equals(other.delta);
++      }
+   }
+ 
+-  /**************************************************************************
+-  ***************************OUT ENVIRONMENT*********************************
+-  ***************************************************************************
+-  */
++  syn Gamma CFGNode.transition(Gamma in) {
++      return new Gamma(in);
++  }
++  eq Assign.transition(Gamma in) {
++      Gamma out = new Gamma(in);
++      Variable decl = getDeclaration();
++      if (getMayBeNull(in)) {
++          out._put(decl, AbsDomain.NULL);
++      }
++      else {
++          out._put(decl, AbsDomain.NOTNULL);
++      }
++      return out;
++  }
+ 
+-  coll Gamma TryStmt.NA_out() with join; // TryStmt is not a CFGNode
++  eq VarAccess.transition(Gamma in) {
++      Gamma out = new Gamma(in);
++      Variable decl = varDecl();
++      if (in.get(decl) == AbsDomain.NULL && isDereferencing()) {
++          out._put(decl, AbsDomain.NOTNULL);
++      }
++      return out;
++  }
+ 
+-  CFGNode contributes  trFun(NA_out())
+-   when getEnclosingTry()!=null to TryStmt.NA_out()  for getEnclosingTry();
++  Set<CFGNode> Program.firstIterationDone = new HashSet<CFGNode>();
++  Set<CFGNode> Program.firstIterationDoneOut = new HashSet<CFGNode>();
+ 
+-  syn Gamma CFGNode.NA_out() circular[new Gamma()] {
+-    Gamma res = new Gamma(NA_in());
+-    res = trFun(res);
+-    return res;
++  syn GammaWithDelta CFGNode.NA_out() circular[new GammaWithDelta()] {
++      // System.out.println("Computing NA_out: " + this + this.lineNumber() + " " + program().firstIterationDone.contains(this));
++      GammaWithDelta in = new GammaWithDelta(NA_in());
++      // System.out.println("Got NA_in: " + this + this.lineNumber() + " " + in.gamma);
++      GammaWithDelta res = new GammaWithDelta();
++      res.delta = transition(program().firstIterationDoneOut.contains(this)
++                             ? in.delta
++                             : in.gamma).minus(NA_out().gamma);
++      res.gamma.join(NA_out().gamma);
++      res.gamma.join(res.delta);
++      // System.out.println("Ret NA_out: " + this + this.lineNumber()
++      //                    + " " + res.gamma + " " + res.delta);
++      program().firstIterationDoneOut.add(this);
++      return res;
+   }
+ 
+-  /**************************************************************************
+-   ***************************IN ENVIRONMENT*********************************
+-   ***************************************************************************
+-   */
+-  syn Gamma CFGNode.NA_in() circular[new Gamma()] {
+-    Gamma res = new Gamma();
+-    for (CFGNode e : pred())
+-      res.join(e.NA_out());
+-    return res;
++  syn GammaWithDelta CFGNode.NA_in() circular[new GammaWithDelta()] {
++      // System.out.println("Computing NA_in: " + this + this.lineNumber() + " " + program().firstIterationDone.contains(this));
++      GammaWithDelta res = new GammaWithDelta();
++      for (CFGNode predecessor : pred()) {
++          // System.out.println("pred: " + this + this.lineNumber() + " " + predecessor + ((ASTNode)predecessor).lineNumber()
++          //                    + " " + predecessor.NA_out().gamma + " " + predecessor.NA_out().delta);
++          res.delta.join(predecessor.NA_out().delta);
++          if (!program().firstIterationDone.contains(this)) {
++              res.delta.join(predecessor.NA_out().gamma);
++          }
++      }
++      res.delta = res.delta.minus(NA_in().gamma);
++      res.gamma.join(NA_in().gamma);
++      res.gamma.join(res.delta);
++      program().firstIterationDone.add(this);
++      // System.out.println("Ret NA_in: " + this + this.lineNumber()
++      //                    + " " + res.gamma + " " + res.delta);
++      return res;
+   }
+-  eq Entry.NA_in() = new Gamma();
++  eq Entry.NA_in() = new GammaWithDelta();
+ 
+   /**************************************************************************
+   ************************** ERROR PREDICATE ********************************
+   *************************** ISNULLABLE ************************************
+   */
+   syn Boolean VarAccess.isNullable() {
+-    AbsDomain res = NA_in().get(varDecl());
++    AbsDomain res = NA_in().gamma.get(varDecl());
+     return isDereferencing() && (res == AbsDomain.NULL);
+   }
+ 
+@@ -133,14 +169,16 @@ public
+   eq EnhancedForStmt.getExpr().isDereferencing() = true;
+   eq CompilationUnit.getChild().isDereferencing() = false;
+ 
+-  syn boolean Expr.getMayBeNull() = false;
+-  eq NullLiteral.getMayBeNull() = true;
+-  eq VarAccess.getMayBeNull() = NA_in().get(varDecl()) == AbsDomain.NULL;
+-  eq AssignExpr.getMayBeNull() = getSource().getMayBeNull();
+-  eq ConditionalExpr.getMayBeNull() =
+-      getTrueExpr().getMayBeNull() || getFalseExpr().getMayBeNull();
+-  syn boolean VariableDeclarator.getMayBeNull() =
+-      hasInit() ? getInit().getMayBeNull() : false;
++  syn boolean Expr.getMayBeNull(Gamma in) = false;
++  eq NullLiteral.getMayBeNull(Gamma in) =  true;
++  eq VarAccess.getMayBeNull(Gamma in) = in.get(varDecl()) == AbsDomain.NULL;
++  eq AssignExpr.getMayBeNull(Gamma in) = getSource().getMayBeNull(in);
++  eq ConditionalExpr.getMayBeNull(Gamma in) =
++      getTrueExpr().getMayBeNull(in) || getFalseExpr().getMayBeNull(in);
++  syn boolean VariableDeclarator.getMayBeNull(Gamma in) =
++      hasInit() ? getInit().getMayBeNull(in) : false;
++  syn boolean ImplicitAssignment.getMayBeNull(Gamma in) =
++      getMayBeNull();
+ 
+   eq CastExpr.varDecl() = getExpr().varDecl();
+ 
+@@ -237,5 +275,5 @@ public
+   }
+   to CFGNode.predColl();
+ 
+- 
+-}
+\ No newline at end of file
++
++}
+diff --git a/src/java/flow/utils/Gamma.java b/src/java/flow/utils/Gamma.java
+index a147651..6456287 100644
+--- a/src/java/flow/utils/Gamma.java
++++ b/src/java/flow/utils/Gamma.java
+@@ -36,6 +36,8 @@ import java.util.Map;
+ import org.extendj.ast.Variable;
+ import org.extendj.flow.utils.AbsDomain;
+ 
++// NOTE: Should inherit from HashSet instead, as we only explicitly
++// keep track of the variables that can be null.
+ public class Gamma extends HashMap<Variable, AbsDomain> {
+ 
+   public Gamma() {}
+@@ -62,6 +64,15 @@ public class Gamma extends HashMap<Variable, AbsDomain> {
+     }
+   }
+ 
++    public Gamma minus(Gamma other) {
++        Gamma result = new Gamma(this);
++        // NOTE: We iterate through `result` instead of `other`.  We ought
++        // to check which approach is faster, or if one has better
++        // guarantees for computational complexity.
++        result.keySet().removeIf(key -> other.containsKey(key));
++        return result;
++    }
++
+   public void join(Gamma gamma) {
+     for (Map.Entry<Variable, AbsDomain> entry : gamma.entrySet()) {
+       this.join(entry.getKey(), entry.getValue());
+@@ -71,6 +82,14 @@ public class Gamma extends HashMap<Variable, AbsDomain> {
+   public Gamma _put(Variable var, AbsDomain abs) {
+     if (var != null)
+       put(var, abs);
++    if (abs == AbsDomain.NOTNULL) {
++        remove(var);
++    }
++
+     return this;
+   }
+-}
+\ No newline at end of file
++
++    public boolean isBottom() {
++        return this.isEmpty();
++    }
++}

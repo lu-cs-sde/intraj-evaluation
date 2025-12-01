@@ -1,0 +1,9 @@
+#+title: Intraj evaluation container definition
+
+To build:
+
+#+begin_src sh
+  ./run
+#+end_src
+
+Results will be put in ~result~ in the project directory.

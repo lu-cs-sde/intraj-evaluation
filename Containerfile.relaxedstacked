@@ -3,7 +3,7 @@
 # openjdk-11-jdk was removed in debian 12, which is needed for
 # extendj, which see below.  Downloading openjdk11 from archives
 # caused other problems.  Bump debian version to 13 if fixed.
-FROM docker.io/debian:11
+FROM docker.io/debian:11 AS intraj
 
 ENV LANG C.UTF-8
 
@@ -72,12 +72,32 @@ RUN cp ../cat/cat.jar tools/cat.jar
 # Create empty cache configuration file.  This is a workaround for a
 # bug in the current relaxed stacked implementation.
 RUN touch ./cache-config.csv
-RUN ./gradlew build
+
+# For removing ansi codes log outputs (ansi2txt)
+RUN apt-get install -y colorized-logs
+
+FROM intraj AS intraj-nonincremental
+RUN ./gradlew --no-watch-fs build
 RUN ./run-cat.sh
-RUN ./gradlew clean build
-
+RUN ./gradlew --no-watch-fs clean build
 WORKDIR ..
+RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
+    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
+    | ansi2txt \
+    > result.log
 
+FROM intraj AS intraj-incremental
+COPY incrementalize.patch incrementalize.patch
+RUN git apply incrementalize.patch
+RUN ./gradlew --no-watch-fs build
+RUN ./run-cat.sh
+RUN ./gradlew --no-watch-fs clean build
+WORKDIR ..
+RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
+    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
+    | ansi2txt \
+    > result.log
 
-# Let's run an analysis...
-RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA
+FROM scratch AS test-results
+COPY --from=intraj-nonincremental /root/result.log nonincremental.log
+COPY --from=intraj-incremental /root/result.log incremental.log
