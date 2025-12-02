@@ -77,9 +77,9 @@ RUN touch ./cache-config.csv
 RUN apt-get install -y colorized-logs
 
 FROM intraj AS intraj-nonincremental
-RUN ./gradlew --no-watch-fs build
+RUN ./gradlew build
 RUN ./run-cat.sh
-RUN ./gradlew --no-watch-fs clean build
+RUN ./gradlew clean build
 WORKDIR ..
 RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
     | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
@@ -89,9 +89,9 @@ RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
 FROM intraj AS intraj-incremental
 COPY incrementalize.patch incrementalize.patch
 RUN git apply incrementalize.patch
-RUN ./gradlew --no-watch-fs build
+RUN ./gradlew build
 RUN ./run-cat.sh
-RUN ./gradlew --no-watch-fs clean build
+RUN ./gradlew clean build
 WORKDIR ..
 RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
     | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
