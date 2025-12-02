@@ -33,7 +33,7 @@ WORKDIR ..
 RUN git clone https://github.com/IdrissRio/RS-SLE2024-Artifact RS-SLE2024-Artifact
 WORKDIR RS-SLE2024-Artifact
 RUN git checkout 8264b44d115d2f7c64aa4d00c047b8c05f82293f
-RUN mv data/evaluation ../analysis-victims
+RUN mv data/evaluation ../analysanda
 WORKDIR ..
 RUN rm -rf RS-SLE2024-Artifact
 
@@ -81,7 +81,7 @@ RUN ./gradlew build
 RUN ./run-cat.sh
 RUN ./gradlew clean build
 WORKDIR ..
-RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
+RUN find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
     | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
     | ansi2txt \
     > result.log
@@ -93,7 +93,7 @@ RUN ./gradlew build
 RUN ./run-cat.sh
 RUN ./gradlew clean build
 WORKDIR ..
-RUN find analysis-victims/antlr-2.7.2/antlr -name '*.java' -print0 \
+RUN find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
     | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
     | ansi2txt \
     > result.log
