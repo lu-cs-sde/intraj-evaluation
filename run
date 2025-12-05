@@ -1,6 +1,19 @@
 #!/usr/bin/env sh
 
-podman build build-context
+podman build build-context \
        --file Containerfile.relaxedstacked \
-       --output results \
-       --target test-results
+       --tag intraj-nonincremental
+
+mkdir -p results/
+
+podman run \
+       --rm \
+       --volume "$PWD/results":/root/results \
+       localhost/intraj-nonincremental:latest \
+       sh -c "find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA | ansi2txt > results/nonincremental.log"
+
+podman run \
+       --rm \
+       --volume "$PWD/results":/root/results \
+       localhost/intraj-incremental:latest \
+       sh -c "find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA | ansi2txt > results/incremental.log"

@@ -3,7 +3,7 @@
 # openjdk-11-jdk was removed in debian 12, which is needed for
 # extendj, which see below.  Downloading openjdk11 from archives
 # caused other problems.  Bump debian version to 13 if fixed.
-FROM docker.io/debian:11 AS intraj
+FROM docker.io/debian:11 AS intraj-base
 
 ENV LANG C.UTF-8
 
@@ -73,31 +73,19 @@ RUN cp ../cat/cat.jar tools/cat.jar
 # bug in the current relaxed stacked implementation.
 RUN touch ./cache-config.csv
 
-# For removing ansi codes log outputs (ansi2txt)
+# For removing ansi codes in log outputs in run script.  (ansi2txt)
 RUN apt-get install -y colorized-logs
 
-FROM intraj AS intraj-nonincremental
+FROM intraj-base AS intraj-nonincremental
 RUN ./gradlew build
 RUN ./run-cat.sh
 RUN ./gradlew clean build
 WORKDIR ..
-RUN find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
-    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
-    | ansi2txt \
-    > result.log
 
-FROM intraj AS intraj-incremental
+FROM intraj-base AS intraj-incremental
 COPY incrementalize.patch incrementalize.patch
 RUN git apply incrementalize.patch
 RUN ./gradlew build
 RUN ./run-cat.sh
 RUN ./gradlew clean build
 WORKDIR ..
-RUN find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
-    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
-    | ansi2txt \
-    > result.log
-
-FROM scratch AS test-results
-COPY --from=intraj-nonincremental /root/result.log nonincremental.log
-COPY --from=intraj-incremental /root/result.log incremental.log
