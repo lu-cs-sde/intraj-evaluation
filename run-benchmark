@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# This script is intended to be run from the container
+# First argument: File to output logs to
+
+find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
+    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
+    | ansi2txt > $1

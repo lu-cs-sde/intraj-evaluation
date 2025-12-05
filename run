@@ -9,11 +9,13 @@ mkdir -p results/
 podman run \
        --rm \
        --volume "$PWD/results":/root/results \
+       --volume "$PWD/run-benchmark":/root/run-benchmark \
        localhost/intraj-nonincremental:latest \
-       sh -c "find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA | ansi2txt > results/nonincremental.log"
+       ./run-benchmark results/incremental.log
 
 podman run \
        --rm \
        --volume "$PWD/results":/root/results \
+       --volume "$PWD/run-benchmark":/root/run-benchmark \
        localhost/intraj-incremental:latest \
-       sh -c "find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA | ansi2txt > results/incremental.log"
+       ./run-benchmark results/nonincremental.log
