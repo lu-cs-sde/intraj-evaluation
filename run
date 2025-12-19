@@ -1,8 +1,16 @@
 #!/usr/bin/env sh
 
+set -e
+
 podman build build-context \
        --file Containerfile.relaxedstacked \
+       --target intraj-nonincremental \
        --tag intraj-nonincremental
+
+podman build build-context \
+       --file Containerfile.relaxedstacked \
+       --target intraj-incremental \
+       --tag intraj-incremental
 
 mkdir -p results/
 
@@ -10,12 +18,12 @@ podman run \
        --rm \
        --volume "$PWD/results":/root/results \
        --volume "$PWD/run-benchmark":/root/run-benchmark \
-       localhost/intraj-nonincremental:latest \
-       ./run-benchmark results/incremental.log
+       intraj-nonincremental \
+       ./run-benchmark results/nonincremental.log
 
 podman run \
        --rm \
        --volume "$PWD/results":/root/results \
        --volume "$PWD/run-benchmark":/root/run-benchmark \
-       localhost/intraj-incremental:latest \
-       ./run-benchmark results/nonincremental.log
+       intraj-incremental \
+       ./run-benchmark results/incremental.log

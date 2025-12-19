@@ -1,8 +1,8 @@
 # -*- dockerfile-image-name: "intraj-relaxedstacked" -*-
 
 # openjdk-11-jdk was removed in debian 12, which is needed for
-# extendj, which see below.  Downloading openjdk11 from archives
-# caused other problems.  Bump debian version to 13 if fixed.
+# extendj, which see below.  Downloading openjdk11 from openjdk
+# archives caused other problems.  Bump debian version to 13 if fixed.
 FROM docker.io/debian:11 AS intraj-base
 
 ENV LANG C.UTF-8
@@ -37,10 +37,10 @@ RUN mv data/evaluation ../analysanda
 WORKDIR ..
 RUN rm -rf RS-SLE2024-Artifact
 
-# RUN apt-get -y install default-jdk
-
 # extendj doesn't support latest java version as of 2025-11-12.
-# Remember to bump debian version above if this gets fixed.
+# Remember to bump debian version above if this gets fixed.  Pulling
+# from openjdk archives causes handshake problems with maven.
+# Probably outdated TLS.
 RUN apt-get -y install openjdk-11-jdk
 
 WORKDIR jastadd
@@ -64,6 +64,9 @@ RUN git apply search-root.patch
 WORKDIR ../../../..
 COPY add-search-root.patch add-search-root.patch
 RUN git apply add-search-root.patch
+# TODO: Should patch option upstream to disable colouring
+COPY remove-output-coloring.patch remove-output-coloring.patch
+RUN git apply remove-output-coloring.patch
 
 RUN cp ../jastadd/jastadd2.jar tools/jastadd2.jar
 RUN cp ../cat/cat.jar tools/cat.jar
@@ -73,8 +76,8 @@ RUN cp ../cat/cat.jar tools/cat.jar
 # bug in the current relaxed stacked implementation.
 RUN touch ./cache-config.csv
 
-# For removing ansi codes in log outputs in run script.  (ansi2txt)
-RUN apt-get install -y colorized-logs
+# Benchmark script is written in python.
+RUN apt-get install -y python3
 
 FROM intraj-base AS intraj-nonincremental
 RUN ./gradlew build

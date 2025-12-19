@@ -1,8 +1,64 @@
-#!/usr/bin/env sh
+#!/usr/bin/env python3
 
 # This script is intended to be run from the container
-# First argument: File to output logs to
+# First argument: File to output logs to.
 
-find analysanda/antlr-2.7.2/antlr -name '*.java' -print0 \
-    | xargs -0 java -jar intraj/intraj.jar -statistics -WNPA \
-    | ansi2txt > $1
+from types import SimpleNamespace
+import sys
+import json
+import os
+import logging
+import subprocess
+import argparse
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+parser = argparse.ArgumentParser("run-benchmark")
+parser.add_argument("out", help="File for writing the output analysis logs of intraj")
+arguments = parser.parse_args()
+
+output_file = open(arguments.out, "w")
+
+projects_file_path = "analysanda/projects.json"
+
+with open(projects_file_path, 'r') as file:
+    benchmarks = json.load(file)['benchmarks']
+    projects = [SimpleNamespace(**benchmark) for benchmark in benchmarks]
+
+for project in projects:
+    if not project.enable:
+        logger.info("Skipping " + project.name)
+        continue
+
+    logger.info("Analyzing " + project.name)
+
+    project_directory = f"/root/analysanda/{project.name}"
+    files = []
+
+    if project.dir_to_analyze == "@COMPILE_ARGS":
+        with open(f"{project_directory}/COMPILE_ARGS", 'r') as inn:
+            files = [f"{project_directory}/{file.rstrip()}" for file in inn.readlines()];
+        # COMPILE_ARGS may contain junk like ./ prefixes
+        files = [os.path.realpath(file) for file in files];
+    else:
+        for root, directories, directory_files in os.walk(project_directory):
+            files += [f"{root}/{file}" for file in directory_files if file.endswith(".java")]
+
+    excluded_directories = [
+        SimpleNamespace(**directory_spec)
+        for directory_spec
+        # If no directory is excluded, the object does not have this field.
+        in getattr(project, 'exclude_dirs', [])];
+
+    for directory in excluded_directories:
+        directory.path = f"{project_directory}/{directory.path}"
+
+    for directory in excluded_directories:
+        logger.info(f"Excluding {directory.path}: {directory.motivation}")
+        files = [file for file in files if not file.startswith(directory.path)]
+
+    completed_process = subprocess.run(["java", "-Xss258m", "-jar", "intraj/intraj.jar", "-statistics", "-WNPA"] + files,
+                                       stdout = output_file)

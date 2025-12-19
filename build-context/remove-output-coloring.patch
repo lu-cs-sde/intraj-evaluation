@@ -1,0 +1,30 @@
+diff --git a/src/java/flow/utils/Utils.java b/src/java/flow/utils/Utils.java
+index 8f17a28..75ef0a2 100644
+--- a/src/java/flow/utils/Utils.java
++++ b/src/java/flow/utils/Utils.java
+@@ -33,12 +33,12 @@ package org.extendj.flow.utils;
+ import java.io.PrintStream;
+ 
+ public class Utils {
+-  private static final String RESET = "\033[0m";          // Text Reset
+-  private static final String YELLOW = "\033[0;33m";      // YELLOW
+-  private static final String YELLOW_BOLD = "\033[1;33m"; // YELLOW_BOLD
+-  private static final String GREEN_BOLD = "\033[1;32m";  // GREEN
+-  private static final String RED_BOLD = "\033[1;31m";    // RED
+-  private static final String WHITE_BOLD = "\033[1;37m";  // WHITE
++  private static final String RESET = "";          // Text Reset
++  private static final String YELLOW = "";      // YELLOW
++  private static final String YELLOW_BOLD = ""; // YELLOW_BOLD
++  private static final String GREEN_BOLD = "";  // GREEN
++  private static final String RED_BOLD = "";    // RED
++  private static final String WHITE_BOLD = "";  // WHITE
+   public static void printWarning(PrintStream out, String location,
+                                   String msg) {
+     out.print(RED_BOLD);
+@@ -82,4 +82,4 @@ public class Utils {
+     }
+     return anotherArray;
+   }
+-}
+\ No newline at end of file
++}
